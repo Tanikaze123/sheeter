@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mic Test — Sheeter</title>
+    <style>
+      body { background: #111; color: #eee; font-family: monospace; padding: 1rem; }
+      button { padding: 0.5rem 1rem; margin: 0.5rem; font-size: 1rem; cursor: pointer; }
+      canvas { display: block; background: #000; margin: 0.5rem 0; border: 1px solid #444; width: 100%; }
+      .notes-row { display: flex; gap: 2rem; margin: 0.5rem 0; }
+      .notes-panel { flex: 1; }
+      .notes-panel h3 { font-size: 0.85rem; margin: 0 0 0.25rem; }
+      .notes-value { font-size: 1.4rem; height: 2rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+      #notes-peak      { color: #4fc3f7; }
+      #notes-envelope  { color: #a5d6a7; }
+      #notes-iterative { color: #ce93d8; }
+      #notes-cqt       { color: #ffcc80; }
+      .method-c h3 { color: #ce93d8; }
+      .method-d h3 { color: #ffcc80; }
+      .method-block { border: 1px solid #333; border-radius: 6px; padding: 0.75rem; margin: 0.75rem 0; }
+      .method-block h3 { margin: 0 0 0.5rem; font-size: 0.9rem; }
+      .method-a h3 { color: #4fc3f7; }
+      .method-b h3 { color: #a5d6a7; }
+      label { display: block; margin: 0.4rem 0; font-size: 0.85rem; color: #ccc; }
+      #log  { font-size: 0.8rem; color: #888; max-height: 150px; overflow-y: auto; }
+      .label { color: #aaa; font-size: 0.85rem; }
+      .chord-btn {
+        background: #222; border: 2px solid #555; color: #aaa;
+        border-radius: 6px; font-size: 1rem; padding: 0.5rem 1.2rem; cursor: pointer;
+        transition: border-color 0.1s, color 0.1s, background 0.1s;
+      }
+      .chord-btn.armed   { border-color: #ffcc80; color: #ffcc80; background: #2a2010; }
+      .chord-btn.matched { border-color: #69f0ae; color: #69f0ae; background: #0d2b1d;
+                           box-shadow: 0 0 10px rgba(105,240,174,0.5); }
+      .chord-match {
+        border-color: #69f0ae !important;
+        box-shadow: 0 0 14px rgba(105, 240, 174, 0.35);
+        transition: border-color 0.1s, box-shadow 0.1s;
+      }
+      .seq-match {
+        border-color: #80deea !important;
+        box-shadow: 0 0 14px rgba(128, 222, 234, 0.35);
+        transition: border-color 0.1s, box-shadow 0.1s;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Mic Test</h2>
+
+    <button id="start-btn">Start Microphone</button>
+    <button id="stop-btn" disabled>Stop</button>
+    <button id="freeze-btn">❚❚ Freeze</button>
+
+    <!-- ── Method A ────────────────────────────────── -->
+    <div id="block-a" class="method-block method-a">
+      <h3>Method A — Peak + Harmonic Suppression</h3>
+
+      <p class="label">Spectrum (raw FFT):</p>
+      <canvas id="spectrum-canvas" width="800" height="160"></canvas>
+
+      <div class="notes-value" id="notes-peak">—</div>
+
+      <label>
+        Noise floor:
+        <input type="range" id="threshold" min="-100" max="-20" value="-70" step="1" />
+        <span id="threshold-display">-70 dB</span>
+      </label>
+      <label>
+        Peak prominence (higher = stricter):
+        <input type="range" id="prominence" min="1" max="40" value="12" step="1" />
+        <span id="prominence-display">12 dB</span>
+      </label>
+      <label>
+        <input type="checkbox" id="harmonics-toggle" checked />
+        Suppress harmonics
+      </label>
+    </div>
+
+    <!-- ── Method B ────────────────────────────────── hidden -->
+    <div id="block-b" class="method-block method-b" style="display: none;"> 
+      <h3>Method B — Spectral Envelope</h3>
+
+      <p class="label">Smoothed envelope spectrum:</p>
+      <canvas id="envelope-canvas" width="800" height="160"></canvas>
+
+      <div class="notes-value" id="notes-envelope">—</div>
+
+      <label>
+        Noise floor:
+        <input type="range" id="threshold-b" min="-100" max="-20" value="-70" step="1" />
+        <span id="threshold-b-display">-70 dB</span>
+      </label>
+      <label>
+        Peak prominence (higher = stricter):
+        <input type="range" id="prominence-b" min="1" max="40" value="12" step="1" />
+        <span id="prominence-b-display">12 dB</span>
+      </label>
+      <label>
+        Bass smoothing A0–C3 (wider = more blur):
+        <input type="range" id="smoothing-bass" min="5" max="150" value="80" step="1" />
+        <span id="smoothing-bass-display">80%</span>
+      </label>
+      <label>
+        Mid smoothing C3–C6:
+        <input type="range" id="smoothing-mid" min="5" max="150" value="30" step="1" />
+        <span id="smoothing-mid-display">30%</span>
+      </label>
+      <label>
+        Treble smoothing C6–C8:
+        <input type="range" id="smoothing-treble" min="5" max="150" value="15" step="1" />
+        <span id="smoothing-treble-display">15%</span>
+      </label>
+      <label>
+        <input type="checkbox" id="harmonics-toggle-b" checked />
+        Suppress harmonics
+      </label>
+    </div>
+
+    <!-- ── Method C ────────────────────────────────── -->
+    <div id="block-c" class="method-block method-c">
+      <h3>Method C — Iterative Harmonic Suppression</h3>
+
+      <p class="label">Spectrum (raw + removed regions highlighted):</p>
+      <canvas id="iterative-canvas" width="800" height="160"></canvas>
+
+      <div class="notes-value" id="notes-iterative">—</div>
+
+      <label>
+        Noise floor:
+        <input type="range" id="threshold-c" min="-100" max="-20" value="-70" step="1" />
+        <span id="threshold-c-display">-70 dB</span>
+      </label>
+      <label>
+        Prominence (higher = stricter):
+        <input type="range" id="prominence-c" min="1" max="40" value="12" step="1" />
+        <span id="prominence-c-display">12 dB</span>
+      </label>
+      <label>
+        Harmonic removal width (% of harmonic frequency):
+        <input type="range" id="removal-width" min="1" max="50" value="10" step="1" />
+        <span id="removal-width-display">10%</span>
+      </label>
+      <label>
+        Max notes per frame:
+        <input type="range" id="max-notes" min="1" max="12" value="6" step="1" />
+        <span id="max-notes-display">6</span>
+      </label>
+    </div>
+
+    <!-- ── Method D ────────────────────────────────── -->
+    <div id="block-d" class="method-block method-d">
+      <h3>Method D — Constant-Q Transform (CQT)</h3>
+      <p class="label">
+        88 bars — one per piano key (A0–C8). Every note gets equal width regardless of register.
+      </p>
+
+      <canvas id="cqt-canvas" width="800" height="160"></canvas>
+
+      <div class="notes-value" id="notes-cqt">—</div>
+
+      <label>
+        Noise floor:
+        <input type="range" id="threshold-d" min="-100" max="-20" value="-70" step="1" />
+        <span id="threshold-d-display">-70 dB</span>
+      </label>
+      <label>
+        Prominence (higher = stricter):
+        <input type="range" id="prominence-d" min="1" max="40" value="10" step="1" />
+        <span id="prominence-d-display">10 dB</span>
+      </label>
+      <label>
+        <input type="checkbox" id="harmonics-toggle-d" checked />
+        Suppress harmonics
+      </label>
+    </div>
+
+    <!-- ── Chord Test ─────────────────────────────── -->
+    <div class="method-block" style="border-color: #555;">
+      <h3 style="color: #e0e0e0;">Chord Test</h3>
+      <p class="label">
+        Arm a chord, then play it. Each method's box lights up if it detects the chord.
+      </p>
+      <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
+        <button id="chord-btn-1" class="chord-btn">B4 D5 G5</button>
+        <button id="chord-btn-2" class="chord-btn">A2 A4 A6</button>
+        <span id="chord-status" class="label" style="margin: 0;">—</span>
+      </div>
+    </div>
+
+    <!-- ── Sequence Detection ─────────────────────── -->
+    <div class="method-block" style="border-color: #555;">
+      <h3 style="color: #e0e0e0;">Sequence Detection</h3>
+      <p class="label">
+        Plays through the sequence — advances when each note/chord is detected.
+        Uses Method D thresholds.
+      </p>
+      <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.5rem;">
+        <button id="seq-toggle-btn">▶ Start</button>
+        <button id="seq-reset-btn">↺ Reset</button>
+        <span id="seq-progress" class="label" style="margin: 0;">0 / 9</span>
+      </div>
+      <div id="seq-next" class="label">Next: A4</div>
+      <div style="height: 5px; background: #333; border-radius: 3px; margin: 0.3rem 0;">
+        <div id="seq-hit-fill" style="height:100%; width:0%; background:#69f0ae; border-radius:3px; transition: width 0.05s;"></div>
+      </div>
+      <div id="seq-list" style="min-height: 3rem; max-height: 220px; overflow-y: auto;
+           font-size: 1rem; color: #eee; padding: 0.2rem 0; line-height: 1.6;"></div>
+    </div>
+
+    <p class="label">Log:</p>
+    <div id="log"></div>
+
+    <script type="module" src="/src/mic-test.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,173 @@
+/* =============================================
+   Base & variables
+   TODO Phase 7: refine colours, typography, spacing
+============================================= */
+:root {
+  --bg: #1a1a2e;
+  --surface: #16213e;
+  --accent: #e94560;
+  --text: #eaeaea;
+  --text-muted: #888;
+  --highlight: rgba(255, 220, 0, 0.3);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+#root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+body {
+  font-family: system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100dvh;         /* dvh = dynamic viewport height, handles mobile browser chrome */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* =============================================
+   Import panel
+============================================= */
+#import-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  height: 100%;
+  padding: 2rem;
+}
+
+.file-drop {
+  width: 100%;
+  max-width: 400px;
+  border: 2px dashed var(--text-muted);
+  border-radius: 12px;
+  padding: 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.file-drop.drag-over {
+  /* TODO: add a visual cue when user drags a file over */
+  border-color: var(--accent);
+}
+
+.file-drop input[type="file"] {
+  /* visually hidden but still focusable/clickable */
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+#start-btn {
+  padding: 0.75rem 2rem;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+#start-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* =============================================
+   Practice view layout
+   Stack: sheet music (grows) → feedback panel → controls
+============================================= */
+#practice-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* =============================================
+   Sheet music area
+   TODO Phase 3: the two canvases need to be stacked
+   Both should have position: absolute inside a
+   position: relative container
+============================================= */
+#sheet-container {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+  background: white;  /* PDF pages are white */
+}
+
+#pdf-canvas,
+#overlay-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* overlay sits on top, transparent background, pointer-events: none so touch works */
+}
+
+#overlay-canvas {
+  pointer-events: none;
+}
+
+/* =============================================
+   Feedback panel
+============================================= */
+#feedback-panel {
+  display: flex;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border-top: 1px solid #333;
+  min-height: 64px;
+  align-items: center;
+}
+
+.hand {
+  flex: 1;
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: bold;
+  padding: 0.4rem;
+  border-radius: 6px;
+  background: #0f3460;
+}
+
+#next-notes {
+  flex: 1;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+/* =============================================
+   Controls bar
+============================================= */
+#controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  background: var(--surface);
+  border-top: 1px solid #333;
+}
+
+#controls button {
+  padding: 0.4rem 1rem;
+  border: 1px solid var(--text-muted);
+  background: transparent;
+  color: var(--text);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+#controls input[type="range"] {
+  width: 80px;
+}

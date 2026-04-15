@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PDF Detection Test — Sheeter</title>
+    <style>
+      body { background: #111; color: #eee; font-family: monospace; padding: 1rem; }
+      h2 { margin-bottom: 0.5rem; }
+      label { font-size: 0.85rem; color: #ccc; display: block; }
+      input[type="range"] { width: 120px; vertical-align: middle; }
+      input[type="file"] { color: #eee; }
+      select { background: #222; color: #eee; border: 1px solid #555; padding: 2px 4px; font-family: monospace; font-size: 0.85rem; }
+
+      .toolbar { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem; }
+      .toolbar label { display: flex; align-items: center; gap: 0.4rem; }
+
+      .stages { display: flex; gap: 1rem; overflow-x: auto; align-items: flex-start; margin-top: 1rem; padding-bottom: 0.5rem; }
+      .stage { flex: none; width: 350px; }
+      .stage h3 { font-size: 0.85rem; color: #aaa; margin-bottom: 0.25rem; }
+      canvas { display: block; width: 100%; border: 1px solid #333; background: #fff; }
+      .stage-controls { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.5rem; padding: 0.5rem; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 4px; }
+      #log { font-size: 0.8rem; color: #888; margin-top: 0.5rem; max-height: 80px; overflow-y: auto; }
+    </style>
+  </head>
+  <body>
+    <h2>PDF Detection Test</h2>
+
+    <div class="toolbar">
+      <label>
+        Zoom: <span id="zoom-display">100%</span>
+        <input type="range" id="zoom" min="25" max="400" value="100" step="5" style="width:140px;" />
+      </label>
+    </div>
+
+    <div class="stages">
+
+      <div class="stage">
+        <h3>1 — Original render</h3>
+        <canvas id="canvas-original"></canvas>
+        <div class="stage-controls">
+          <label>
+            PDF file:
+            <input type="file" id="pdf-input" accept=".pdf" />
+          </label>
+          <label>
+            Page:
+            <input type="number" id="page-input" min="1" value="1" style="width:50px;" />
+          </label>
+        </div>
+      </div>
+
+      <div class="stage">
+        <h3>2 — Binary</h3>
+        <canvas id="canvas-binary"></canvas>
+        <div class="stage-controls">
+          <label>
+            Gaussian sigma: <span id="gauss-sigma-display">1.0</span>
+            <input type="range" id="gauss-sigma" min="0" max="30" value="10" step="1" />
+          </label>
+          <label>
+            Otsu threshold (auto): <span id="otsu-display">—</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:0.4rem;">
+            <input type="checkbox" id="use-otsu" checked /> Use Otsu (uncheck for manual)
+          </label>
+          <label>
+            Manual threshold: <span id="black-threshold-display">128</span>
+            <input type="range" id="black-threshold" min="10" max="255" value="128" step="1" />
+          </label>
+        </div>
+      </div>
+
+      <div class="stage">
+        <h3>3 — Dilated</h3>
+        <canvas id="canvas-dilated"></canvas>
+        <div class="stage-controls">
+          <label>
+            Dilate radius px: <span id="dilate-radius-display">2</span>
+            <input type="range" id="dilate-radius" min="0" max="10" value="2" step="1" />
+          </label>
+          <label>
+            Kernel type:
+            <select id="kernel-type">
+              <option value="square">square</option>
+              <option value="cross">cross</option>
+              <option value="horizontal">horizontal</option>
+              <option value="vertical">vertical</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div class="stage">
+        <h3>4 — Connected components</h3>
+        <canvas id="canvas-boxes"></canvas>
+      </div>
+
+      <div class="stage">
+        <h3>5 — Staff lines detected</h3>
+        <canvas id="canvas-stafflines"></canvas>
+        <div class="stage-controls">
+          <label>
+            Min line width %: <span id="min-line-width-display">70%</span>
+            <input type="range" id="min-line-width" min="30" max="95" value="70" step="1" />
+          </label>
+          <label>
+            Collapse gap px: <span id="collapse-gap-display">3</span>
+            <input type="range" id="collapse-gap" min="1" max="20" value="3" step="1" />
+          </label>
+        </div>
+      </div>
+
+    </div>
+
+    <div style="margin-top:1.5rem; display:flex; align-items:center; gap:1rem;">
+      <h3 style="color:#888; font-size:0.85rem; letter-spacing:0.05em; margin:0;">STAFF REMOVAL</h3>
+    </div>
+
+    <div class="stages">
+      <div class="stage">
+        <h3>6 — Staff lines removed</h3>
+        <canvas id="canvas-staff-removed"></canvas>
+      </div>
+      <div class="stage">
+        <h3>SR2 — Note candidates</h3>
+        <canvas id="canvas-notes-detected"></canvas>
+        <div class="stage-controls">
+          <label>
+            MIDI file:
+            <input type="file" id="midi-input" accept=".mid,.midi" />
+          </label>
+          <span id="midi-status" style="color:#888;font-size:0.8rem;">—</span>
+        </div>
+      </div>
+      <div class="stage">
+        <h3>SR3 — Detection animation</h3>
+        <div class="stage-controls">
+          <div style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center;">
+            <button id="btn-anim-reset">↺</button>
+            <button id="btn-anim-step">Step →</button>
+            <button id="btn-anim-play">▶ Play</button>
+            <span id="anim-status" style="color:#888;font-size:0.8rem;">0 / 0</span>
+          </div>
+          <label>
+            Speed: <span id="anim-speed-display">50ms</span>
+            <input type="range" id="anim-speed" min="10" max="300" value="50" step="10" />
+          </label>
+        </div>
+        <canvas id="canvas-notes-anim"></canvas>
+      </div>
+    </div>
+
+    <div style="margin-top:1.5rem; display:flex; align-items:center; gap:1rem;">
+      <h3 style="color:#888; font-size:0.85rem; letter-spacing:0.05em; margin:0;">MIDI CROSS-CHECK</h3>
+    </div>
+
+    <div class="stages">
+      <div class="stage">
+        <h3>M1 — Diff (detected vs MIDI)</h3>
+        <canvas id="canvas-midi-diff"></canvas>
+      </div>
+      <div class="stage" style="min-width:350px; flex:1;">
+        <h3>M2 — Mismatch zoom (40×40)</h3>
+        <div id="midi-thumbnails" style="display:flex;flex-wrap:wrap;gap:0.5rem;max-height:420px;overflow-y:auto;background:#1a1a1a;padding:0.5rem;border:1px solid #2a2a2a;border-radius:4px;"></div>
+      </div>
+      <div class="stage" style="min-width:200px;">
+        <h3>M3 — Missed notes</h3>
+        <div id="midi-missed" style="font-size:0.8rem;color:#ff0;line-height:1.6;max-height:420px;overflow-y:auto;background:#1a1a1a;padding:0.5rem;border:1px solid #2a2a2a;border-radius:4px;">—</div>
+      </div>
+    </div>
+
+    <div style="margin-top:1.5rem; display:flex; align-items:center; gap:1rem;">
+      <h3 style="color:#888; font-size:0.85rem; letter-spacing:0.05em; margin:0;">NOTE DETECTION</h3>
+      <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.85rem;color:#ccc;">
+        <input type="checkbox" id="enable-eclipse-detection" /> Enable eclipse detection
+      </label>
+    </div>
+
+    <div class="stages" id="note-stages">
+
+      <div class="stage">
+        <h3>N1 — Eroded</h3>
+        <canvas id="canvas-eroded"></canvas>
+        <div class="stage-controls">
+          <label>
+            Kernel type:
+            <select id="erode-kernel-type">
+              <option value="vertical">vertical</option>
+              <option value="horizontal">horizontal</option>
+              <option value="cross">cross</option>
+              <option value="square">square</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div class="stage">
+        <h3>N2 — Restored</h3>
+        <canvas id="canvas-restored"></canvas>
+        <div class="stage-controls">
+          <label>
+            Kernel type:
+            <select id="restore-kernel-type">
+              <option value="eclipse">eclipse</option>
+              <option value="vertical">vertical</option>
+              <option value="horizontal">horizontal</option>
+              <option value="cross">cross</option>
+              <option value="square">square</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div class="stage">
+        <h3>N2b — Gradient vote (restored)</h3>
+        <canvas id="canvas-vote-restored"></canvas>
+        <div class="stage-controls">
+          <label>
+            Edge stride (every N): <span id="vote-stride-display">12</span>
+            <input type="range" id="vote-stride" min="1" max="20" value="12" step="1" />
+          </label>
+          <label style="display:flex;align-items:center;gap:0.4rem;">
+            <input type="checkbox" id="show-dots" checked /> Edge dots
+          </label>
+          <label style="display:flex;align-items:center;gap:0.4rem;">
+            <input type="checkbox" id="show-arrows" checked /> Gradient arrows
+          </label>
+          <label style="display:flex;align-items:center;gap:0.4rem;">
+            <input type="checkbox" id="show-centers" checked /> Centers
+          </label>
+          <label style="display:flex;align-items:center;gap:0.4rem;">
+            <input type="checkbox" id="show-ellipses" checked /> Ellipses
+          </label>
+        </div>
+      </div>
+
+      <div class="stage">
+        <h3>N3 — Eclipse dilated</h3>
+        <canvas id="canvas-eclipse"></canvas>
+        <div class="stage-controls">
+          <label>
+            Kernel type:
+            <select id="eclipse-kernel-type">
+              <option value="eclipse">eclipse</option>
+              <option value="square">square</option>
+              <option value="cross">cross</option>
+              <option value="horizontal">horizontal</option>
+              <option value="vertical">vertical</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div class="stage">
+        <h3>N3b — Gradient vote (eclipse)</h3>
+        <canvas id="canvas-vote-eclipse"></canvas>
+      </div>
+
+    </div>
+
+    <div id="log"></div>
+
+    <script type="module" src="/src/pdf-test.ts"></script>
+  </body>
+</html>

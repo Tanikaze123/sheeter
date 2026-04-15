@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sheet Music Labeler</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { background: #111; color: #eee; font-family: monospace; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+      /* ── Toolbar ── */
+      #toolbar {
+        display: flex; align-items: center; gap: 0.75rem;
+        padding: 0.5rem 1rem; background: #1a1a1a; border-bottom: 1px solid #2a2a2a;
+        flex-shrink: 0;
+      }
+      #toolbar h1 { font-size: 0.9rem; color: #888; letter-spacing: 0.08em; margin-right: 0.5rem; }
+      button.toolbar-btn {
+        background: #2a2a2a; color: #eee; border: 1px solid #444;
+        padding: 4px 10px; font-family: monospace; font-size: 0.8rem; cursor: pointer;
+        border-radius: 3px;
+      }
+      button.toolbar-btn:hover { background: #383838; }
+      #status { font-size: 0.75rem; color: #888; margin-left: auto; }
+      label.zoom-label { font-size: 0.8rem; color: #aaa; display: flex; align-items: center; gap: 0.4rem; }
+      input[type="range"] { width: 90px; }
+      input[type="file"] { display: none; }
+
+      /* ── Loading overlay ── */
+      #loading-overlay {
+        position: fixed; inset: 0; background: rgba(0,0,0,0.72);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 100;
+      }
+      #loading-overlay.hidden { display: none; }
+      #loading-box {
+        background: #1a1a1a; border: 1px solid #333; border-radius: 6px;
+        padding: 2rem 3rem; display: flex; flex-direction: column;
+        align-items: center; gap: 1rem; min-width: 260px;
+      }
+      .spinner {
+        width: 34px; height: 34px;
+        border: 3px solid #2a2a2a; border-top-color: #00c850;
+        border-radius: 50%; animation: spin 0.75s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      #loading-msg   { font-size: 0.85rem; color: #ccc; text-align: center; }
+      #loading-phase { font-size: 0.72rem; color: #555; text-align: center; min-height: 1em; }
+
+      /* ── Main layout ── */
+      #main { display: flex; flex: 1; overflow: hidden; }
+
+      /* ── Left panel: sheets + box list ── */
+      #left-panel {
+        width: 180px; flex-shrink: 0; display: flex; flex-direction: column;
+        background: #151515; border-right: 1px solid #2a2a2a; overflow: hidden;
+      }
+      .panel-header { font-size: 0.7rem; color: #666; letter-spacing: 0.1em; padding: 6px 8px 4px; border-bottom: 1px solid #222; }
+      #sheets-list { flex: 1; overflow-y: auto; max-height: 50%; }
+      #sheets-list .sheet-item {
+        display: flex; align-items: center; gap: 6px;
+        padding: 5px 8px; cursor: pointer; font-size: 0.75rem; color: #bbb;
+        border-bottom: 1px solid #1e1e1e;
+      }
+      #sheets-list .sheet-item:hover { background: #1e1e1e; }
+      #sheets-list .sheet-item.active { background: #1e3a1e; color: #eee; }
+      #sheets-list .sheet-item canvas { width: 36px; height: 46px; object-fit: contain; border: 1px solid #333; flex-shrink: 0; }
+      #boxes-panel { flex: 1; overflow-y: auto; border-top: 1px solid #222; }
+      #boxes-list .box-item {
+        display: flex; align-items: center; gap: 6px;
+        padding: 4px 8px; cursor: pointer; font-size: 0.73rem; color: #bbb;
+        border-bottom: 1px solid #1a1a1a;
+      }
+      #boxes-list .box-item:hover { background: #1e1e1e; }
+      #boxes-list .box-item.selected { background: #1e2a3a; }
+      #boxes-list .box-swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+      #del-selected-btn {
+        background: #2a1515; color: #f88; border: 1px solid #5a2a2a;
+        padding: 4px 8px; font-family: monospace; font-size: 0.75rem;
+        cursor: pointer; width: 100%; border-top: 1px solid #2a2a2a;
+      }
+      #del-selected-btn:hover { background: #3a1515; }
+
+      /* ── Center: crop area ── */
+      #center-panel {
+        flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #0e0e0e;
+      }
+      #crop-nav {
+        display: flex; align-items: center; gap: 0.5rem;
+        padding: 5px 10px; background: #181818; border-bottom: 1px solid #222;
+        font-size: 0.8rem; color: #888; flex-shrink: 0;
+      }
+      #crop-nav button {
+        background: #2a2a2a; color: #eee; border: 1px solid #444;
+        padding: 2px 8px; font-family: monospace; cursor: pointer; border-radius: 2px;
+      }
+      #crop-nav button:hover { background: #383838; }
+      #crop-nav button:disabled { opacity: 0.3; cursor: default; }
+      #crop-nav #crop-counter { margin: 0 4px; }
+      #crop-scroll { flex: 1; overflow: auto; display: flex; flex-direction: column; align-items: center; padding: 1rem; gap: 0.75rem; }
+      #crop-wrap { position: relative; display: inline-block; cursor: crosshair; flex-shrink: 0; }
+      #crop-wrap canvas { display: block; }
+      #overlay-canvas { position: absolute; top: 0; left: 0; cursor: crosshair; }
+      #ref-wrap { display: inline-block; flex-shrink: 0; }
+      #ref-wrap canvas { display: block; }
+      #ref-label { font-size: 0.65rem; color: #555; letter-spacing: 0.08em; text-align: center; padding: 2px 0 4px; }
+
+      /* ── Right panel: classes ── */
+      #right-panel {
+        width: 170px; flex-shrink: 0; overflow-y: auto;
+        background: #151515; border-left: 1px solid #2a2a2a;
+      }
+      .class-btn {
+        display: flex; align-items: center; gap: 6px;
+        width: 100%; padding: 6px 8px; background: none; border: none;
+        border-bottom: 1px solid #1e1e1e; color: #bbb; font-family: monospace;
+        font-size: 0.75rem; cursor: pointer; text-align: left;
+      }
+      .class-btn:hover { background: #1e1e1e; }
+      .class-btn.active { background: #1e2a1e; color: #eee; }
+      .class-btn .key-hint { color: #555; font-size: 0.65rem; margin-left: auto; }
+      .class-icon { width: 28px; height: 28px; flex-shrink: 0; }
+    </style>
+  </head>
+  <body>
+
+    <!-- Loading overlay -->
+    <div id="loading-overlay" class="hidden">
+      <div id="loading-box">
+        <div class="spinner"></div>
+        <div id="loading-msg">Processing…</div>
+        <div id="loading-phase"></div>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div id="toolbar">
+      <h1>LABELER</h1>
+      <button class="toolbar-btn" id="btn-upload">Upload PDFs</button>
+      <input type="file" id="pdf-input" multiple accept=".pdf" />
+      <button class="toolbar-btn" id="btn-load-labels">Load Labels</button>
+      <input type="file" id="labels-input" accept=".json" />
+      <button class="toolbar-btn" id="btn-export">Export All</button>
+      <label class="zoom-label">
+        Zoom <span id="zoom-val">100%</span>
+        <input type="range" id="zoom-slider" min="50" max="400" value="100" step="10" />
+      </label>
+      <span id="status">Upload PDFs to begin.</span>
+    </div>
+
+    <!-- Main -->
+    <div id="main">
+
+      <!-- Left: sheet list + box list -->
+      <div id="left-panel">
+        <div class="panel-header">SHEETS</div>
+        <div id="sheets-list"></div>
+        <div class="panel-header">BOXES</div>
+        <div id="boxes-panel">
+          <div id="boxes-list"></div>
+          <button id="del-selected-btn">Delete selected</button>
+        </div>
+      </div>
+
+      <!-- Center: crop view -->
+      <div id="center-panel">
+        <div id="crop-nav">
+          <button id="btn-prev-crop" disabled>◀</button>
+          <span id="crop-counter">— / —</span>
+          <button id="btn-next-crop" disabled>▶</button>
+          <span id="crop-sheet-label" style="margin-left:8px;color:#666;"></span>
+        </div>
+        <div id="crop-scroll">
+          <div id="crop-wrap">
+            <canvas id="base-canvas"></canvas>
+            <canvas id="overlay-canvas"></canvas>
+          </div>
+          <div id="ref-wrap">
+            <div id="ref-label">ORIGINAL</div>
+            <canvas id="ref-canvas"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: class selector -->
+      <div id="right-panel">
+        <div class="panel-header">CLASSES</div>
+        <div id="class-list"></div>
+      </div>
+
+    </div>
+
+    <script type="module" src="/src/labeler.ts"></script>
+  </body>
+</html>

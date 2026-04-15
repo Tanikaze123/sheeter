@@ -1,0 +1,29 @@
+{
+  "name": "sheeter",
+  "version": "0.1.0",
+  "description": "Sheet music practice app — PDF + MIDI + live piano feedback",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "host": "vite --host"
+  },
+  "dependencies": {
+    "@tonejs/midi": "^2.0.28",
+    "essentia.js": "^0.1.3",
+    "pdfjs-dist": "^4.0.379",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tone": "^15.0.4"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "typescript": "^5.3.3",
+    "vite": "^7.0.0",
+    "vite-plugin-pwa": "^0.21.0"
+  }
+}
