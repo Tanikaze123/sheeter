@@ -33,6 +33,10 @@
         z-index: 100;
       }
       #loading-overlay.hidden { display: none; }
+      #debug-modal { display: none; flex-direction: column; align-items: center; overflow: auto; padding: 1.5rem; gap: 1rem; }
+      #debug-modal:not(.hidden) { display: flex; }
+      #debug-thresh-row { display: none; }
+      #debug-thresh-row:not(.hidden) { display: flex; }
       #loading-box {
         background: #1a1a1a; border: 1px solid #333; border-radius: 6px;
         padding: 2rem 3rem; display: flex; flex-direction: column;
@@ -52,9 +56,16 @@
 
       /* ── Left panel: sheets + box list ── */
       #left-panel {
-        width: 180px; flex-shrink: 0; display: flex; flex-direction: column;
-        background: #151515; border-right: 1px solid #2a2a2a; overflow: hidden;
+        width: 200px; min-width: 120px; max-width: 520px;
+        flex-shrink: 0; display: flex; flex-direction: column;
+        background: #151515; overflow: hidden;
       }
+      #left-resize {
+        width: 5px; flex-shrink: 0; cursor: col-resize;
+        background: #2a2a2a; border-right: 1px solid #333;
+        transition: background 0.15s;
+      }
+      #left-resize:hover, #left-resize.dragging { background: #00c850; }
       .panel-header { font-size: 0.7rem; color: #666; letter-spacing: 0.1em; padding: 6px 8px 4px; border-bottom: 1px solid #222; }
       #sheets-list { flex: 1; overflow-y: auto; max-height: 50%; }
       #sheets-list .sheet-item {
@@ -119,10 +130,62 @@
       .class-btn:hover { background: #1e1e1e; }
       .class-btn.active { background: #1e2a1e; color: #eee; }
       .class-btn .key-hint { color: #555; font-size: 0.65rem; margin-left: auto; }
+      .class-btn .class-count { font-size: 0.65rem; color: #00c850; min-width: 1.8em; text-align: right; flex-shrink: 0; }
       .class-icon { width: 28px; height: 28px; flex-shrink: 0; }
+
+      /* ── Progress ── */
+      #progress-summary { font-size: 0.72rem; color: #666; white-space: nowrap; }
+      #progress-summary b { color: #aaa; }
+      #mark-done-btn {
+        background: #1a2a1a; color: #5a5; border: 1px solid #3a5a3a;
+        padding: 2px 10px; font-family: monospace; font-size: 0.8rem; cursor: pointer; border-radius: 2px;
+        margin-left: auto;
+      }
+      #mark-done-btn:hover { background: #223322; }
+      #mark-done-btn.done { background: #1a3a1a; color: #4d4; border-color: #4d4; }
+      .sheet-item .sheet-prog { font-size: 0.65rem; color: #555; white-space: nowrap; }
+      .sheet-dbg-btn {
+        flex-shrink: 0; margin-left: auto; background: none; border: 1px solid #333;
+        border-radius: 3px; cursor: pointer; font-size: 0.65rem; padding: 1px 4px;
+        line-height: 1; color: #555;
+      }
+      .sheet-dbg-btn:hover { border-color: #666; color: #ccc; }
+      .sheet-dbg-btn.warn  { color: #f66; border-color: #633; }
+      .sheet-dbg-btn.loose { color: #fa0; border-color: #640; }
+      .sheet-item .sheet-prog.complete { color: #4d4; }
+      .song-header {
+        padding: 5px 8px 3px; font-size: 0.65rem; color: #888; letter-spacing: 0.06em;
+        background: #111; border-bottom: 1px solid #222; border-top: 1px solid #222;
+        display: flex; align-items: center; gap: 5px;
+      }
+      .song-header .song-midi { color: #3a6; font-size: 0.6rem; }
     </style>
   </head>
   <body>
+
+    <!-- Debug modal -->
+    <div id="debug-modal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:200;">
+      <div style="display:flex;align-items:center;gap:1rem;flex-shrink:0;width:100%;max-width:1100px;">
+        <span id="debug-title" style="font-size:0.85rem;color:#ccc;font-family:monospace;"></span>
+        <button id="debug-close" style="
+          margin-left:auto;background:#2a2a2a;color:#eee;border:1px solid #555;
+          padding:3px 14px;font-family:monospace;font-size:0.8rem;cursor:pointer;border-radius:3px;">✕ Close</button>
+      </div>
+      <pre id="debug-stats" style="font-size:0.75rem;color:#888;font-family:monospace;flex-shrink:0;margin:0;"></pre>
+      <!-- Threshold tweak controls (hidden until page has fullGrey data) -->
+      <div id="debug-thresh-row" class="hidden" style="display:flex;align-items:center;gap:0.75rem;flex-shrink:0;">
+        <span style="font-size:0.75rem;color:#aaa;font-family:monospace;">Threshold:</span>
+        <input type="range" id="debug-thresh-slider" min="1" max="254" value="128" style="width:200px;">
+        <span id="debug-thresh-val" style="font-size:0.8rem;color:#eee;font-family:monospace;min-width:2.5em;">128</span>
+        <button id="debug-thresh-apply" style="
+          background:#1a2a1a;color:#5d5;border:1px solid #3a5a3a;
+          padding:3px 12px;font-family:monospace;font-size:0.8rem;cursor:pointer;border-radius:3px;">
+          ↺ Re-run
+        </button>
+        <span id="debug-thresh-status" style="font-size:0.72rem;color:#666;font-family:monospace;"></span>
+      </div>
+      <canvas id="debug-canvas" style="max-width:100%;border:1px solid #333;flex-shrink:0;image-rendering:pixelated;"></canvas>
+    </div>
 
     <!-- Loading overlay -->
     <div id="loading-overlay" class="hidden">
@@ -136,15 +199,20 @@
     <!-- Toolbar -->
     <div id="toolbar">
       <h1>LABELER</h1>
+      <button class="toolbar-btn" id="btn-select-folder">Select Folder</button>
       <button class="toolbar-btn" id="btn-upload">Upload PDFs</button>
       <input type="file" id="pdf-input" multiple accept=".pdf" />
       <button class="toolbar-btn" id="btn-load-labels">Load Labels</button>
       <input type="file" id="labels-input" accept=".json" />
+      <button class="toolbar-btn" id="btn-save-progress">Save Progress</button>
+      <button class="toolbar-btn" id="btn-load-progress">Load Progress</button>
+      <input type="file" id="progress-input" accept=".json" />
       <button class="toolbar-btn" id="btn-export">Export All</button>
       <label class="zoom-label">
         Zoom <span id="zoom-val">100%</span>
         <input type="range" id="zoom-slider" min="50" max="400" value="100" step="10" />
       </label>
+      <span id="progress-summary"></span>
       <span id="status">Upload PDFs to begin.</span>
     </div>
 
@@ -162,6 +230,9 @@
         </div>
       </div>
 
+      <!-- Resize handle -->
+      <div id="left-resize"></div>
+
       <!-- Center: crop view -->
       <div id="center-panel">
         <div id="crop-nav">
@@ -169,6 +240,7 @@
           <span id="crop-counter">— / —</span>
           <button id="btn-next-crop" disabled>▶</button>
           <span id="crop-sheet-label" style="margin-left:8px;color:#666;"></span>
+          <button id="mark-done-btn" disabled>✓ Done</button>
         </div>
         <div id="crop-scroll">
           <div id="crop-wrap">

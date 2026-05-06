@@ -216,6 +216,76 @@ const CLASSES = [
       <line x1="14" y1="4" x2="14" y2="24" stroke="#cc88ff" stroke-width="1.5"/>
     </svg>`,
   },
+  // ── Numeric time signatures ──────────────────────────────────────────────────
+  {
+    id: 28, name: 'time_2_4', color: '#ff9966', key: 'j',
+    svg: `<svg viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+      <text x="14" y="13" text-anchor="middle" font-size="11" font-family="serif" fill="#ff9966">2</text>
+      <text x="14" y="25" text-anchor="middle" font-size="11" font-family="serif" fill="#ff9966">4</text>
+    </svg>`,
+  },
+  {
+    id: 29, name: 'time_3_4', color: '#ffbb44', key: 'k',
+    svg: `<svg viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+      <text x="14" y="13" text-anchor="middle" font-size="11" font-family="serif" fill="#ffbb44">3</text>
+      <text x="14" y="25" text-anchor="middle" font-size="11" font-family="serif" fill="#ffbb44">4</text>
+    </svg>`,
+  },
+  {
+    id: 30, name: 'time_4_4', color: '#ffe066', key: 'l',
+    svg: `<svg viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+      <text x="14" y="13" text-anchor="middle" font-size="11" font-family="serif" fill="#ffe066">4</text>
+      <text x="14" y="25" text-anchor="middle" font-size="11" font-family="serif" fill="#ffe066">4</text>
+    </svg>`,
+  },
+  {
+    id: 31, name: 'time_2_2', color: '#99ff99', key: 'z',
+    svg: `<svg viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+      <text x="14" y="13" text-anchor="middle" font-size="11" font-family="serif" fill="#99ff99">2</text>
+      <text x="14" y="25" text-anchor="middle" font-size="11" font-family="serif" fill="#99ff99">2</text>
+    </svg>`,
+  },
+  {
+    id: 32, name: 'time_3_8', color: '#66ffcc', key: 'x',
+    svg: `<svg viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+      <text x="14" y="13" text-anchor="middle" font-size="11" font-family="serif" fill="#66ffcc">3</text>
+      <text x="14" y="25" text-anchor="middle" font-size="11" font-family="serif" fill="#66ffcc">8</text>
+    </svg>`,
+  },
+  {
+    id: 33, name: 'time_6_8', color: '#44ddff', key: 'c',
+    svg: `<svg viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+      <text x="14" y="13" text-anchor="middle" font-size="11" font-family="serif" fill="#44ddff">6</text>
+      <text x="14" y="25" text-anchor="middle" font-size="11" font-family="serif" fill="#44ddff">8</text>
+    </svg>`,
+  },
+  {
+    id: 34, name: 'time_9_8', color: '#66aaff', key: 'v',
+    svg: `<svg viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+      <text x="14" y="13" text-anchor="middle" font-size="11" font-family="serif" fill="#66aaff">9</text>
+      <text x="14" y="25" text-anchor="middle" font-size="11" font-family="serif" fill="#66aaff">8</text>
+    </svg>`,
+  },
+  {
+    id: 35, name: 'time_12_8', color: '#aa88ff', key: 'b',
+    svg: `<svg viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+      <text x="14" y="13" text-anchor="middle" font-size="9" font-family="serif" fill="#aa88ff">12</text>
+      <text x="14" y="25" text-anchor="middle" font-size="11" font-family="serif" fill="#aa88ff">8</text>
+    </svg>`,
+  },
+  // ── Sustain pedal ────────────────────────────────────────────────────────────
+  {
+    id: 36, name: 'pedal_mark', color: '#88ccff', key: 'n',
+    svg: `<svg viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+      <text x="14" y="21" text-anchor="middle" font-size="10" font-family="serif" font-style="italic" fill="#88ccff">Ped</text>
+    </svg>`,
+  },
+  {
+    id: 37, name: 'pedal_release', color: '#aaddff', key: '',
+    svg: `<svg viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+      <text x="14" y="22" text-anchor="middle" font-size="18" fill="#aaddff">✱</text>
+    </svg>`,
+  },
 ]
 
 // ── Data model ────────────────────────────────────────────────────────────────
@@ -233,11 +303,14 @@ interface SystemCrop {
   canvas: HTMLCanvasElement      // staff-removed (greyscale binary)
   origCanvas: HTMLCanvasElement  // original full-colour render
   labels: LabelBox[]
+  done: boolean
 }
 
 interface Sheet {
   id: string
   filename: string
+  songName: string       // parent folder name ('' when uploaded individually)
+  midiFilename: string   // MIDI filename found alongside the PDF ('' if none)
   pageNum: number
   width: number; height: number
   staffRemoved: Uint8Array
@@ -245,15 +318,34 @@ interface Sheet {
   staffLines:  { r: number; c: number; w: number; h: number }[]
   S: number
   crops: SystemCrop[]
+  // Detection diagnostics
+  threshold: number       // Otsu threshold (0–255)
+  widthPctUsed: number    // width filter that found systems (0 = full-page fallback)
+  rawSystemCount: number  // boxes found before fallback
+  // Full-res greyscale kept for threshold tweaking (re-run phases 3–7)
+  fullGrey: Uint8Array
+  // Debug pixel data stored at 25% scale for on-demand rendering
+  dbgW: number; dbgH: number
+  dbgGrey:    Uint8Array
+  dbgBinary:  Uint8Array
+  dbgDilated: Uint8Array
 }
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 
+const btnSelectFolder = document.getElementById('btn-select-folder') as HTMLButtonElement
 const btnUpload     = document.getElementById('btn-upload')      as HTMLButtonElement
 const pdfInputEl    = document.getElementById('pdf-input')       as HTMLInputElement
 const btnLoadLabels = document.getElementById('btn-load-labels') as HTMLButtonElement
 const labelsInputEl = document.getElementById('labels-input')    as HTMLInputElement
-const btnExport     = document.getElementById('btn-export')      as HTMLButtonElement
+const btnExport        = document.getElementById('btn-export')         as HTMLButtonElement
+const btnSaveProgress  = document.getElementById('btn-save-progress')  as HTMLButtonElement
+const btnLoadProgress  = document.getElementById('btn-load-progress')  as HTMLButtonElement
+// progressInputEl kept for potential fallback use
+const _progressInputEl = document.getElementById('progress-input')     as HTMLInputElement
+void _progressInputEl
+const progressSummary  = document.getElementById('progress-summary')   as HTMLSpanElement
+const markDoneBtn      = document.getElementById('mark-done-btn')      as HTMLButtonElement
 const zoomSlider    = document.getElementById('zoom-slider')     as HTMLInputElement
 const zoomValEl     = document.getElementById('zoom-val')        as HTMLSpanElement
 const statusEl      = document.getElementById('status')          as HTMLSpanElement
@@ -280,6 +372,7 @@ let currentCropIdx = 0
 let activeClassId  = 0
 let selectedBoxId: string | null = null
 let zoom = 1.0
+let progressDirHandle: FileSystemDirectoryHandle | null = null
 
 // Draw state
 let isDragging = false
@@ -298,6 +391,7 @@ for (const cls of CLASSES) {
     <span class="class-icon">${cls.svg}</span>
     ${cls.name}
     ${cls.key ? `<span class="key-hint">[${cls.key}]</span>` : ''}
+    <span class="class-count"></span>
   `
   btn.addEventListener('click', () => setActiveClass(cls.id))
   classListEl.appendChild(btn)
@@ -313,11 +407,40 @@ function setActiveClass(id: number) {
 
 // ── Toolbar wiring ────────────────────────────────────────────────────────────
 
+btnSelectFolder.addEventListener('click', onSelectFolder)
+
 btnUpload.addEventListener('click', () => pdfInputEl.click())
 pdfInputEl.addEventListener('change', onPdfFilesSelected)
 
 btnLoadLabels.addEventListener('click', () => labelsInputEl.click())
 labelsInputEl.addEventListener('change', onLoadLabels)
+
+btnSaveProgress.addEventListener('click', () => saveProgress())
+btnLoadProgress.addEventListener('click', onLoadProgress)
+
+markDoneBtn.addEventListener('click', toggleDone)
+
+// ── Left-panel resize ─────────────────────────────────────────────────────────
+;(() => {
+  const leftPanel  = document.getElementById('left-panel')!
+  const handle     = document.getElementById('left-resize')!
+  let dragging = false, startX = 0, startW = 0
+  handle.addEventListener('mousedown', e => {
+    dragging = true; startX = e.clientX; startW = leftPanel.offsetWidth
+    handle.classList.add('dragging')
+    e.preventDefault()
+  })
+  window.addEventListener('mousemove', e => {
+    if (!dragging) return
+    const w = Math.max(120, Math.min(520, startW + e.clientX - startX))
+    leftPanel.style.width = `${w}px`
+  })
+  window.addEventListener('mouseup', () => {
+    if (!dragging) return
+    dragging = false
+    handle.classList.remove('dragging')
+  })
+})()
 
 btnExport.addEventListener('click', onExportAll)
 
@@ -332,6 +455,129 @@ btnNextCrop.addEventListener('click', () => navigateCrop(+1))
 
 delSelectedBtn.addEventListener('click', deleteSelected)
 
+// ── Folder scan ───────────────────────────────────────────────────────────────
+
+interface SongEntry {
+  name: string
+  pdfFiles: File[]
+  midiFilename: string   // first .mid/.midi found, '' if none
+}
+
+async function onSelectFolder() {
+  if (!(window as any).showDirectoryPicker) {
+    alert('Your browser does not support the File System Access API.\nUse Chrome or Edge, and make sure the page is served over HTTPS.')
+    return
+  }
+
+  let dirHandle: FileSystemDirectoryHandle
+  try {
+    dirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' })
+  } catch (err: any) {
+    if (err?.name === 'AbortError') return  // user cancelled
+    setStatus(`Could not open folder picker: ${err?.message ?? err}`)
+    console.error('showDirectoryPicker failed:', err)
+    return
+  }
+  progressDirHandle = dirHandle  // reuse for auto-save
+
+  showLoading('Scanning folder…', 'looking for songs…')
+  await yieldToUI()
+
+  try {
+    // ── Scan ────────────────────────────────────────────────────────────────
+    // Collect root-level PDFs as a single "unnamed" song entry.
+    // Each sub-folder is treated as one song.
+    const songs: SongEntry[] = []
+    const rootSong: SongEntry = { name: '', pdfFiles: [], midiFilename: '' }
+
+    for await (const [name, handle] of (dirHandle as any).entries()) {
+      const lower = (name as string).toLowerCase()
+      if (handle.kind === 'file') {
+        if (lower.endsWith('.pdf')) rootSong.pdfFiles.push(await handle.getFile())
+        else if ((lower.endsWith('.mid') || lower.endsWith('.midi')) && !rootSong.midiFilename)
+          rootSong.midiFilename = name as string
+      } else if (handle.kind === 'directory') {
+        const song: SongEntry = { name: name as string, pdfFiles: [], midiFilename: '' }
+        for await (const [fname, fhandle] of handle.entries()) {
+          if (fhandle.kind !== 'file') continue
+          const fl = (fname as string).toLowerCase()
+          if (fl.endsWith('.pdf')) song.pdfFiles.push(await fhandle.getFile())
+          else if ((fl.endsWith('.mid') || fl.endsWith('.midi')) && !song.midiFilename)
+            song.midiFilename = fname as string
+        }
+        if (song.pdfFiles.length > 0) {
+          song.pdfFiles.sort((a, b) => a.name.localeCompare(b.name))
+          songs.push(song)
+        }
+      }
+    }
+
+    if (rootSong.pdfFiles.length > 0) {
+      rootSong.pdfFiles.sort((a, b) => a.name.localeCompare(b.name))
+      songs.unshift(rootSong)
+    }
+
+    songs.sort((a, b) => a.name.localeCompare(b.name))
+
+    if (songs.length === 0) {
+      hideLoading()
+      setStatus('No PDFs found in the selected folder or its sub-folders.')
+      return
+    }
+
+    const totalPdfs = songs.reduce((s, g) => s + g.pdfFiles.length, 0)
+    const totalMidi = songs.filter(g => g.midiFilename).length
+    setStatus(`Found ${songs.length} song(s), ${totalPdfs} PDF(s), ${totalMidi} MIDI(s).`)
+
+    // ── Reset ────────────────────────────────────────────────────────────────
+    sheets = []
+    allCrops = []
+    currentCropIdx = 0
+    sheetsList.innerHTML = ''
+    _lastSongHeader = ''
+
+    // ── Process ──────────────────────────────────────────────────────────────
+    let pagesDone = 0
+    // Pre-count pages (load each PDF once, keep pdf objects to reuse)
+    type PdfEntry = { song: SongEntry; file: File; pdf: any; numPages: number }
+    const pdfEntries: PdfEntry[] = []
+    for (const song of songs) {
+      for (const file of song.pdfFiles) {
+        updateLoadingPhase(`loading ${file.name}…`)
+        await yieldToUI()
+        const buf = await file.arrayBuffer()
+        const pdf = await pdfjsLib.getDocument({ data: buf }).promise
+        pdfEntries.push({ song, file, pdf, numPages: (pdf as any).numPages })
+      }
+    }
+    const totalPages = pdfEntries.reduce((s, e) => s + e.numPages, 0)
+
+    for (const { song, file, pdf, numPages } of pdfEntries) {
+      for (let p = 1; p <= numPages; p++) {
+        pagesDone++
+        showLoading(`Processing page ${pagesDone} / ${totalPages}`, `${song.name || file.name} — page ${p}`)
+        await yieldToUI()
+        const sheet = await processPage(pdf, file.name, p, '', song.name, song.midiFilename)
+        sheets.push(sheet)
+        allCrops.push(...sheet.crops)
+        addSheetToList(sheet)
+      }
+    }
+
+    hideLoading()
+    updateProgressSummary()
+    const songCount = songs.filter(s => s.name).length
+    setStatus(`${songCount || totalPdfs} song(s) · ${sheets.length} pages · ${allCrops.length} crops.`)
+    if (allCrops.length > 0) showCrop(0)
+
+    await saveProgress(dirHandle)
+  } catch (err) {
+    hideLoading()
+    setStatus(`Error scanning folder: ${(err as Error).message}`)
+    console.error('onSelectFolder error:', err)
+  }
+}
+
 // ── PDF processing ────────────────────────────────────────────────────────────
 
 async function onPdfFilesSelected() {
@@ -341,6 +587,7 @@ async function onPdfFilesSelected() {
   allCrops = []
   currentCropIdx = 0
   sheetsList.innerHTML = ''
+  _lastSongHeader = ''
 
   // Count total pages across all files first
   showLoading('Loading PDFs…', 'reading files…')
@@ -370,6 +617,7 @@ async function onPdfFilesSelected() {
   }
 
   hideLoading()
+  updateProgressSummary()
   setStatus(`${sheets.length} page(s) loaded, ${allCrops.length} system crops.`)
   if (allCrops.length > 0) showCrop(0)
 }
@@ -378,18 +626,23 @@ async function processPage(
   pdf: Awaited<ReturnType<typeof pdfjsLib.getDocument>['promise']>,
   filename: string,
   pageNum: number,
-  pageLabel: string
+  pageLabel: string,
+  songName = '',
+  midiFilename = ''
 ): Promise<Sheet> {
   // ── Phase 1: PDF render ───────────────────────────────────────────────────
   updateLoadingPhase(`${pageLabel} — rendering PDF…`)
   const page = await pdf.getPage(pageNum)
   const viewport = page.getViewport({ scale: 1.5 })
-  const { width, height } = viewport
+  const width  = Math.round(viewport.width)
+  const height = Math.round(viewport.height)
 
   const offscreen = document.createElement('canvas')
   offscreen.width  = width
   offscreen.height = height
   const ctx = offscreen.getContext('2d')!
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, offscreen.width, offscreen.height)
   await page.render({ canvasContext: ctx, viewport }).promise
   const imageData = ctx.getImageData(0, 0, width, height)
   const { data } = imageData
@@ -400,6 +653,7 @@ async function processPage(
   const grey = new Uint8Array(width * height)
   for (let i = 0; i < width * height; i++)
     grey[i] = Math.round((data[i * 4] + data[i * 4 + 1] + data[i * 4 + 2]) / 3)
+  const fullGrey = grey  // keep reference for threshold tweaking
 
   // ── Phase 3: Gaussian blur + threshold ───────────────────────────────────
   updateLoadingPhase(`${pageLabel} — blur + threshold…`)
@@ -420,9 +674,21 @@ async function processPage(
   const dilated = dilateRect(binary, width, height, 40, 10)
   const { labels, count } = labelComponents(dilated, width, height)
   const stats = getComponentStats(labels, count, width, height)
-  const systemBoxes = stats
-    .filter(b => b.boundingBox.w > width * 0.8)
-    .map(b => b.boundingBox)
+
+  // Try progressively looser width thresholds until we find something.
+  // Some PDFs have narrower staves (landscape, wide margins, multi-column).
+  let systemBoxes: { r: number; c: number; w: number; h: number }[] = []
+  let widthPctUsed = 0
+  for (const pct of [0.8, 0.6, 0.4]) {
+    systemBoxes = stats.filter(b => b.boundingBox.w > width * pct).map(b => b.boundingBox)
+    if (systemBoxes.length > 0) { widthPctUsed = pct; break }
+  }
+  const rawSystemCount = systemBoxes.length
+  // Last resort: treat the whole page as one crop
+  if (systemBoxes.length === 0) {
+    console.warn(`processPage: no system boxes found for ${filename} p${pageNum} (threshold=${threshold}) — using full page`)
+    systemBoxes = [{ r: 0, c: 0, w: width, h: height }]
+  }
 
   // ── Phase 5: Staff line detection ────────────────────────────────────────
   updateLoadingPhase(`${pageLabel} — detecting staff lines…`)
@@ -487,6 +753,26 @@ async function processPage(
   const intraGaps = staffGaps.filter(g => g < 30).sort((a, b) => a - b)
   const S = intraGaps.length > 0 ? intraGaps[Math.floor(intraGaps.length / 2)] : 10
 
+  // ── Phase 6b: Subsample debug data at 25% scale ───────────────────────────
+  updateLoadingPhase(`${pageLabel} — building debug data…`)
+  await yieldToUI()
+  const dbgScale = 0.25
+  const dbgW = Math.max(1, Math.round(width  * dbgScale))
+  const dbgH = Math.max(1, Math.round(height * dbgScale))
+  const dbgGrey    = new Uint8Array(dbgW * dbgH)
+  const dbgBinary  = new Uint8Array(dbgW * dbgH)
+  const dbgDilated = new Uint8Array(dbgW * dbgH)
+  for (let dy = 0; dy < dbgH; dy++) {
+    const sy = Math.round(dy / dbgScale)
+    for (let dx = 0; dx < dbgW; dx++) {
+      const sx  = Math.round(dx / dbgScale)
+      const idx = sy * width + sx
+      dbgGrey[dy * dbgW + dx]    = grey[idx]
+      dbgBinary[dy * dbgW + dx]  = binaryClean[idx]
+      dbgDilated[dy * dbgW + dx] = dilated[idx]
+    }
+  }
+
   // ── Phase 7: Render crops ─────────────────────────────────────────────────
   updateLoadingPhase(`${pageLabel} — rendering crops…`)
   await yieldToUI()
@@ -532,34 +818,78 @@ async function processPage(
     }
     origCropCtx.putImageData(origCropImg, 0, 0)
 
-    return { sheetId: id, sysIdx, r, c, w, h, canvas: cropCanvas, origCanvas: origCropCanvas, labels: [] }
+    return { sheetId: id, sysIdx, r, c, w, h, canvas: cropCanvas, origCanvas: origCropCanvas, labels: [], done: false }
   })
 
-  return { id, filename, pageNum, width, height, staffRemoved, systemBoxes, staffLines, S, crops }
+  return { id, filename, songName, midiFilename, pageNum, width, height, staffRemoved, systemBoxes, staffLines, S, crops, threshold, widthPctUsed, rawSystemCount, fullGrey, dbgW, dbgH, dbgGrey, dbgBinary, dbgDilated }
 }
 
 // ── Sheet list ────────────────────────────────────────────────────────────────
 
+// Track the last song name so we know when to insert a new header
+let _lastSongHeader = ''
+
 function addSheetToList(sheet: Sheet) {
+  // Insert a song name header whenever the song changes
+  if (sheet.songName && sheet.songName !== _lastSongHeader) {
+    _lastSongHeader = sheet.songName
+    const header = document.createElement('div')
+    header.className = 'song-header'
+    header.dataset['songName'] = sheet.songName
+    header.textContent = sheet.songName
+    if (sheet.midiFilename) {
+      const midiTag = document.createElement('span')
+      midiTag.className = 'song-midi'
+      midiTag.textContent = '♪ midi'
+      header.appendChild(midiTag)
+    }
+    sheetsList.appendChild(header)
+  }
+
   const item = document.createElement('div')
   item.className = 'sheet-item'
   item.dataset['sheetId'] = sheet.id
 
+  // Warning badge if detection fell back (widthPctUsed=0 means full-page fallback)
+  const isFallback = sheet.widthPctUsed === 0
+  const isLoose    = sheet.widthPctUsed > 0 && sheet.widthPctUsed < 0.8
+
   const thumb = document.createElement('canvas')
   thumb.width  = 36
   thumb.height = 46
-  // Render mini thumbnail of first crop if available
   if (sheet.crops.length > 0) {
     const ctx = thumb.getContext('2d')!
-    const src = sheet.crops[0].canvas
-    ctx.drawImage(src, 0, 0, 36, 46)
+    ctx.drawImage(sheet.crops[0].canvas, 0, 0, 36, 46)
+    if (isFallback) {
+      ctx.fillStyle = 'rgba(255,80,80,0.25)'
+      ctx.fillRect(0, 0, 36, 46)
+    } else if (isLoose) {
+      ctx.fillStyle = 'rgba(255,180,0,0.2)'
+      ctx.fillRect(0, 0, 36, 46)
+    }
   }
 
   const label = document.createElement('span')
-  label.textContent = `${sheet.filename} p${sheet.pageNum}`
+  label.textContent = sheet.songName
+    ? `p${sheet.pageNum} · ${sheet.filename}`
+    : `${sheet.filename} p${sheet.pageNum}`
+
+  const prog = document.createElement('span')
+  prog.className = 'sheet-prog'
+  prog.dataset['sheetId'] = sheet.id
+  updateSheetProgEl(prog, sheet)
+
+  // Debug button — always visible, coloured by detection quality
+  const dbgBtn = document.createElement('button')
+  dbgBtn.className = 'sheet-dbg-btn' + (isFallback ? ' warn' : isLoose ? ' loose' : '')
+  dbgBtn.textContent = isFallback ? '⚠' : isLoose ? '?' : '…'
+  dbgBtn.title = isFallback ? 'Detection failed — click to debug' : isLoose ? 'Loose detection — click to debug' : 'Click to inspect pipeline'
+  dbgBtn.addEventListener('click', e => { e.stopPropagation(); showDebugModal(sheet) })
 
   item.appendChild(thumb)
   item.appendChild(label)
+  item.appendChild(prog)
+  item.appendChild(dbgBtn)
   item.addEventListener('click', () => {
     const firstIdx = allCrops.findIndex(c => c.sheetId === sheet.id)
     if (firstIdx >= 0) showCrop(firstIdx)
@@ -567,11 +897,408 @@ function addSheetToList(sheet: Sheet) {
   sheetsList.appendChild(item)
 }
 
+function updateSheetProgEl(el: HTMLSpanElement, sheet: Sheet) {
+  const done  = sheet.crops.filter(c => c.done).length
+  const total = sheet.crops.length
+  el.textContent = `${done}/${total}`
+  el.classList.toggle('complete', done === total && total > 0)
+}
+
+function updateSheetProgress(sheetId: string) {
+  const sheet = sheets.find(s => s.id === sheetId)
+  if (!sheet) return
+  const el = sheetsList.querySelector<HTMLSpanElement>(`.sheet-prog[data-sheet-id="${sheetId}"]`)
+  if (el) updateSheetProgEl(el, sheet)
+}
+
+function updateSheetProgressAll() {
+  for (const sheet of sheets) updateSheetProgress(sheet.id)
+}
+
 function updateSheetListActive() {
   const crop = allCrops[currentCropIdx]
   if (!crop) return
   for (const el of sheetsList.querySelectorAll<HTMLDivElement>('.sheet-item')) {
     el.classList.toggle('active', el.dataset['sheetId'] === crop.sheetId)
+  }
+}
+
+// ── Debug modal ───────────────────────────────────────────────────────────────
+
+const debugModal        = document.getElementById('debug-modal')!
+const debugTitle        = document.getElementById('debug-title')!
+const debugStats        = document.getElementById('debug-stats')!
+const debugCanvas       = document.getElementById('debug-canvas') as HTMLCanvasElement
+const debugThreshRow    = document.getElementById('debug-thresh-row')!
+const debugThreshSlider = document.getElementById('debug-thresh-slider') as HTMLInputElement
+const debugThreshVal    = document.getElementById('debug-thresh-val')!
+const debugThreshApply  = document.getElementById('debug-thresh-apply') as HTMLButtonElement
+const debugThreshStatus = document.getElementById('debug-thresh-status')!
+
+let _debugSheet: Sheet | null = null   // sheet currently shown in debug modal
+
+document.getElementById('debug-close')!.addEventListener('click', () => {
+  debugModal.classList.add('hidden')
+})
+debugModal.addEventListener('click', e => {
+  if (e.target === debugModal) debugModal.classList.add('hidden')
+})
+debugThreshSlider.addEventListener('input', () => {
+  debugThreshVal.textContent = debugThreshSlider.value
+})
+debugThreshApply.addEventListener('click', async () => {
+  if (!_debugSheet) return
+  const t = parseInt(debugThreshSlider.value)
+  debugThreshApply.disabled = true
+  debugThreshStatus.textContent = 'running…'
+  await reprocessSheetThreshold(_debugSheet, t)
+  debugThreshStatus.textContent = `applied (${t})`
+  debugThreshApply.disabled = false
+  // Refresh debug view with updated sheet data
+  await showDebugModal(_debugSheet)
+})
+
+async function reprocessSheetThreshold(sheet: Sheet, newThreshold: number) {
+  const { fullGrey: grey, width, height } = sheet
+  if (!grey.length) return
+
+  await yieldToUI()
+
+  // Phase 3: re-binarize with new threshold (skip blur — use raw grey for speed)
+  const binary      = new Uint8Array(width * height)
+  const binaryClean = new Uint8Array(width * height)
+  for (let i = 0; i < width * height; i++) {
+    binary[i]      = grey[i] < newThreshold ? 1 : 0
+    binaryClean[i] = grey[i] < newThreshold ? 1 : 0
+  }
+  await yieldToUI()
+
+  // Phase 4: dilation → system boxes
+  const dilated = dilateRect(binary, width, height, 40, 10)
+  const { labels, count } = labelComponents(dilated, width, height)
+  const stats = getComponentStats(labels, count, width, height)
+  await yieldToUI()
+
+  let systemBoxes: { r: number; c: number; w: number; h: number }[] = []
+  let widthPctUsed = 0
+  for (const pct of [0.8, 0.6, 0.4]) {
+    systemBoxes = stats.filter(b => b.boundingBox.w > width * pct).map(b => b.boundingBox)
+    if (systemBoxes.length > 0) { widthPctUsed = pct; break }
+  }
+  const rawSystemCount = systemBoxes.length
+  if (systemBoxes.length === 0) systemBoxes = [{ r: 0, c: 0, w: width, h: height }]
+
+  // Phase 5: staff line detection
+  const minPct = 0.8
+  const rawStaffRows = new Set<number>()
+  for (let y = 0; y < height; y++) {
+    let maxRun = 0, run = 0
+    for (let x = 0; x < width; x++) {
+      if (binaryClean[y * width + x] === 1) { run++; if (run > maxRun) maxRun = run }
+      else run = 0
+    }
+    if (maxRun > width * minPct) rawStaffRows.add(y)
+  }
+  await yieldToUI()
+
+  const staffLineBoxes: { r: number; c: number; w: number; h: number }[] = []
+  let groupStart = -1
+  for (let y = 0; y <= height; y++) {
+    const here = rawStaffRows.has(y), prev = rawStaffRows.has(y - 1)
+    if (here && !prev) groupStart = y
+    if (!here && prev && groupStart >= 0) {
+      const h = y - groupStart
+      if (h <= 4) {
+        let minX = width, maxX = 0
+        for (let yr = groupStart; yr < y; yr++)
+          for (let x = 0; x < width; x++)
+            if (binaryClean[yr * width + x] === 1) { if (x < minX) minX = x; if (x > maxX) maxX = x }
+        if (maxX >= minX) staffLineBoxes.push({ r: groupStart, c: minX, w: maxX - minX + 1, h })
+      }
+      groupStart = -1
+    }
+  }
+  const staffLines = staffLineBoxes.filter(b => b.w > width * minPct).sort((a, b) => a.r - b.r)
+
+  // Phase 6: staff removal
+  const staffRemoved = new Uint8Array(binaryClean)
+  const tolerance = 2
+  for (const { r, c, w, h } of staffLines) {
+    for (let x = c; x < c + w; x++) {
+      let noteAbove = false
+      for (let yr = r - 1; yr >= 0; yr--) {
+        if (!binaryClean[yr * width + x]) break
+        if (yr < r - tolerance) { noteAbove = true; break }
+      }
+      let noteBelow = false
+      for (let yr = r + h; yr < height; yr++) {
+        if (!binaryClean[yr * width + x]) break
+        if (yr >= r + h + tolerance) { noteBelow = true; break }
+      }
+      if (!noteAbove && !noteBelow)
+        for (let yr = r; yr < r + h; yr++) staffRemoved[yr * width + x] = 0
+    }
+  }
+  await yieldToUI()
+
+  const staffYs   = staffLines.map(b => b.r)
+  const staffGaps = staffYs.slice(1).map((y, i) => y - staffYs[i])
+  const intraGaps = staffGaps.filter(g => g < 30).sort((a, b) => a - b)
+  const S = intraGaps.length > 0 ? intraGaps[Math.floor(intraGaps.length / 2)] : 10
+
+  // Phase 6b: rebuild debug arrays at 25% scale
+  const dbgScale = 0.25
+  const dbgW = Math.max(1, Math.round(width * dbgScale))
+  const dbgH = Math.max(1, Math.round(height * dbgScale))
+  const dbgGrey    = new Uint8Array(dbgW * dbgH)
+  const dbgBinary  = new Uint8Array(dbgW * dbgH)
+  const dbgDilated = new Uint8Array(dbgW * dbgH)
+  for (let dy = 0; dy < dbgH; dy++) {
+    const sy = Math.round(dy / dbgScale)
+    for (let dx = 0; dx < dbgW; dx++) {
+      const sx = Math.round(dx / dbgScale)
+      const i  = sy * width + sx
+      dbgGrey[dy * dbgW + dx]    = grey[i]
+      dbgBinary[dy * dbgW + dx]  = binaryClean[i]
+      dbgDilated[dy * dbgW + dx] = dilated[i]
+    }
+  }
+
+  // Phase 7: re-render crop canvases (preserve existing labels + done state)
+  const newCrops: SystemCrop[] = systemBoxes.map((box, sysIdx) => {
+    const { r, c, w, h } = box
+    const existing = sheet.crops.find(cr => cr.sysIdx === sysIdx)
+
+    const cropCanvas = document.createElement('canvas')
+    cropCanvas.width = w; cropCanvas.height = h
+    const cropImg = new ImageData(w, h)
+    for (let row = 0; row < h; row++)
+      for (let col = 0; col < w; col++) {
+        const v = staffRemoved[(r + row) * width + (c + col)] === 1 ? 0 : 255
+        const d = (row * w + col) * 4
+        cropImg.data[d] = cropImg.data[d+1] = cropImg.data[d+2] = v; cropImg.data[d+3] = 255
+      }
+    cropCanvas.getContext('2d')!.putImageData(cropImg, 0, 0)
+
+    const origCanvas = existing?.origCanvas ?? cropCanvas
+    return {
+      sheetId: sheet.id, sysIdx,
+      r, c, w, h,
+      canvas:     cropCanvas,
+      origCanvas: origCanvas,
+      labels: existing?.labels ?? [],
+      done:   existing?.done   ?? false,
+    }
+  })
+  await yieldToUI()
+
+  // Mutate sheet in-place so all references stay valid
+  sheet.threshold     = newThreshold
+  sheet.widthPctUsed  = widthPctUsed
+  sheet.rawSystemCount= rawSystemCount
+  sheet.staffLines    = staffLines
+  sheet.staffRemoved  = staffRemoved
+  sheet.systemBoxes   = systemBoxes
+  sheet.S             = S
+  sheet.dbgW = dbgW; sheet.dbgH = dbgH
+  sheet.dbgGrey    = dbgGrey
+  sheet.dbgBinary  = dbgBinary
+  sheet.dbgDilated = dbgDilated
+
+  // Sync allCrops: remove old crops for this sheet, insert new ones at same position
+  const firstIdx = allCrops.findIndex(c => c.sheetId === sheet.id)
+  const oldCount = sheet.crops.length
+  sheet.crops = newCrops
+  if (firstIdx >= 0) allCrops.splice(firstIdx, oldCount, ...newCrops)
+  else allCrops.push(...newCrops)
+
+  // Update sheet thumbnail in sidebar
+  const item = sheetsList.querySelector<HTMLDivElement>(`.sheet-item[data-sheet-id="${sheet.id}"]`)
+  if (item) {
+    const thumb = item.querySelector('canvas')
+    if (thumb && newCrops.length > 0) {
+      const tc = thumb.getContext('2d')!
+      tc.clearRect(0, 0, 36, 46)
+      tc.drawImage(newCrops[0].canvas, 0, 0, 36, 46)
+    }
+  }
+
+  // Re-render if currently viewing this sheet
+  if (allCrops[currentCropIdx]?.sheetId === sheet.id) renderCurrentCrop()
+  updateProgressSummary()
+  updateSheetProgress(sheet.id)
+}
+
+async function showDebugModal(sheet: Sheet, keepThreshSlider = false) {
+  const fallback  = sheet.widthPctUsed === 0
+  const fromCache = sheet.widthPctUsed === -1
+  const detection = fromCache
+    ? 'loaded from cache — no pipeline data'
+    : fallback
+    ? 'FULL-PAGE FALLBACK (no systems detected at any width)'
+    : `${Math.round(sheet.widthPctUsed * 100)}% width filter → ${sheet.rawSystemCount} system(s)`
+
+  _debugSheet = sheet
+  debugTitle.textContent = `${sheet.filename}  p${sheet.pageNum}`
+  debugStats.textContent = [
+    `Page size    : ${sheet.width} × ${sheet.height} px  (render scale 1.5)`,
+    `Otsu thresh  : ${fromCache ? '—' : sheet.threshold}  (healthy range: 100–200; white page = too high, black page = too low)`,
+    `Detection    : ${detection}`,
+    `Staff lines  : ${sheet.staffLines.length}`,
+    `Crops        : ${sheet.crops.length}`,
+    fallback
+      ? '\n⚠  No systems found. Binary image is likely all-white or all-black — check step 2 below.'
+      : fromCache
+      ? '\n(Pipeline steps not available for cache-loaded sheets — reload from PDF to see steps.)'
+      : sheet.widthPctUsed < 0.8
+      ? '\n⚠  Loose width filter used — staves may be narrower than expected.'
+      : '',
+  ].join('\n').trimEnd()
+
+  // Show/hide threshold controls depending on whether we have full-res grey data
+  const hasGrey = sheet.fullGrey.length > 0
+  debugThreshRow.classList.toggle('hidden', !hasGrey)
+  if (hasGrey && !keepThreshSlider) {
+    debugThreshSlider.value  = String(sheet.threshold)
+    debugThreshVal.textContent = String(sheet.threshold)
+    debugThreshStatus.textContent = ''
+  }
+
+  // Show modal immediately with stats — render steps asynchronously below
+  debugCanvas.width  = 1
+  debugCanvas.height = 1
+  debugModal.classList.remove('hidden')
+  await yieldToUI()
+
+  if (fromCache || sheet.dbgW === 0) return   // no pixel data available
+
+  // ── Build 4-step composite: [Original] [Binary] [Dilated] [Staff-removed+boxes] ──
+
+  const W = sheet.dbgW
+  const H = sheet.dbgH
+  const PAD  = 8   // gap between panels
+  const LABEL_H = 18
+
+  // Step canvases at debug resolution
+  const steps: { label: string; draw: (ctx: CanvasRenderingContext2D) => void }[] = [
+    {
+      label: '1. Original (first crop)',
+      draw: ctx => {
+        if (sheet.crops.length > 0) {
+          ctx.drawImage(sheet.crops[0].origCanvas, 0, LABEL_H, W, H)
+        } else {
+          ctx.fillStyle = '#333'
+          ctx.fillRect(0, LABEL_H, W, H)
+          ctx.fillStyle = '#888'
+          ctx.fillText('no crop', 4, LABEL_H + H / 2)
+        }
+      },
+    },
+    {
+      label: '2. Greyscale',
+      draw: ctx => {
+        const img = new ImageData(W, H)
+        for (let i = 0; i < W * H; i++) {
+          const v = sheet.dbgGrey[i]
+          img.data[i*4] = img.data[i*4+1] = img.data[i*4+2] = v
+          img.data[i*4+3] = 255
+        }
+        ctx.putImageData(img, 0, LABEL_H)
+      },
+    },
+    {
+      label: `3. Binary (thresh=${sheet.threshold})`,
+      draw: ctx => {
+        const img = new ImageData(W, H)
+        for (let i = 0; i < W * H; i++) {
+          const v = sheet.dbgBinary[i] === 1 ? 0 : 255
+          img.data[i*4] = img.data[i*4+1] = img.data[i*4+2] = v
+          img.data[i*4+3] = 255
+        }
+        ctx.putImageData(img, 0, LABEL_H)
+      },
+    },
+    {
+      label: '4. Dilated blobs',
+      draw: ctx => {
+        const img = new ImageData(W, H)
+        for (let i = 0; i < W * H; i++) {
+          const v = sheet.dbgDilated[i] === 1 ? 0 : 255
+          img.data[i*4] = img.data[i*4+1] = img.data[i*4+2] = v
+          img.data[i*4+3] = 255
+        }
+        ctx.putImageData(img, 0, LABEL_H)
+      },
+    },
+    {
+      label: '5. Staff-removed + system boxes',
+      draw: ctx => {
+        const dbgScale = W / sheet.width
+        const img = new ImageData(sheet.width, sheet.height)
+        for (let i = 0; i < sheet.width * sheet.height; i++) {
+          const v = sheet.staffRemoved[i] === 1 ? 0 : 255
+          img.data[i*4] = img.data[i*4+1] = img.data[i*4+2] = v; img.data[i*4+3] = 255
+        }
+        const tmp = document.createElement('canvas')
+        tmp.width = sheet.width; tmp.height = sheet.height
+        tmp.getContext('2d')!.putImageData(img, 0, 0)
+        ctx.drawImage(tmp, 0, LABEL_H, W, H)
+
+        const colours = ['#f55','#5af','#5f5','#fa0','#c5f','#0dd']
+        ctx.lineWidth = 1.5
+        sheet.systemBoxes.forEach((b, idx) => {
+          ctx.strokeStyle = colours[idx % colours.length]
+          ctx.fillStyle   = colours[idx % colours.length] + '33'
+          ctx.fillRect  (b.c*dbgScale, LABEL_H + b.r*dbgScale, b.w*dbgScale, b.h*dbgScale)
+          ctx.strokeRect(b.c*dbgScale, LABEL_H + b.r*dbgScale, b.w*dbgScale, b.h*dbgScale)
+        })
+        ctx.strokeStyle = 'rgba(255,220,0,0.7)'
+        ctx.lineWidth = 0.5
+        for (const sl of sheet.staffLines) {
+          const y = LABEL_H + (sl.r + sl.h/2) * dbgScale
+          ctx.beginPath()
+          ctx.moveTo(sl.c * dbgScale, y)
+          ctx.lineTo((sl.c + sl.w) * dbgScale, y)
+          ctx.stroke()
+        }
+      },
+    },
+  ]
+
+  // Layout: steps side by side horizontally, wrapping at max ~1200px
+  const COLS  = Math.min(steps.length, 3)
+  const ROWS  = Math.ceil(steps.length / COLS)
+  const cellW = W + PAD
+  const cellH = H + LABEL_H + PAD
+  debugCanvas.width  = COLS * cellW - PAD
+  debugCanvas.height = ROWS * cellH - PAD
+  const ctx = debugCanvas.getContext('2d')!
+  ctx.fillStyle = '#111'
+  ctx.fillRect(0, 0, debugCanvas.width, debugCanvas.height)
+  ctx.font = '11px monospace'
+
+  for (let si = 0; si < steps.length; si++) {
+    const col = si % COLS
+    const row = Math.floor(si / COLS)
+    const ox  = col * cellW
+    const oy  = row * cellH
+
+    // Step content drawn into offscreen then blitted
+    const off = document.createElement('canvas')
+    off.width  = W
+    off.height = H + LABEL_H
+    const offCtx = off.getContext('2d')!
+    offCtx.fillStyle = '#222'
+    offCtx.fillRect(0, 0, W, H + LABEL_H)
+    steps[si].draw(offCtx)
+    ctx.drawImage(off, ox, oy)
+
+    // Label drawn after blit so it isn't overwritten
+    ctx.fillStyle = '#ccc'
+    ctx.font = '11px monospace'
+    ctx.fillText(steps[si].label, ox + 4, oy + 13)
+
+    await yieldToUI()   // yield between steps — keeps UI responsive
   }
 }
 
@@ -589,6 +1316,7 @@ function showCrop(idx: number) {
   updateCropNav()
   updateSheetListActive()
   renderBoxesList()
+  updateDoneButton()
 }
 
 function updateCropNav() {
@@ -775,6 +1503,8 @@ function canvasCoords(e: MouseEvent) {
 function renderBoxesList() {
   const crop = allCrops[currentCropIdx]
   boxesList.innerHTML = ''
+  updateClassCounts()
+  updateProgressSummary()
   if (!crop) return
 
   for (const box of crop.labels) {
@@ -878,7 +1608,315 @@ document.addEventListener('keydown', e => {
     }
     return
   }
+
+  if (key === 'm') { toggleDone(); return }
 })
+
+// ── Done / progress ───────────────────────────────────────────────────────────
+
+function toggleDone() {
+  const crop = allCrops[currentCropIdx]
+  if (!crop) return
+  crop.done = !crop.done
+  updateDoneButton()
+  updateSheetProgress(crop.sheetId)
+  updateProgressSummary()
+  // Auto-advance to next undone crop when marking done
+  if (crop.done) {
+    const next = allCrops.findIndex((c, i) => i > currentCropIdx && !c.done)
+    if (next >= 0) showCrop(next)
+  }
+}
+
+function updateDoneButton() {
+  const crop = allCrops[currentCropIdx]
+  markDoneBtn.disabled = !crop
+  if (!crop) { markDoneBtn.textContent = '✓ Done'; markDoneBtn.classList.remove('done'); return }
+  markDoneBtn.classList.toggle('done', crop.done)
+  markDoneBtn.textContent = crop.done ? '✓ Done' : '○ Mark done'
+}
+
+function updateClassCounts() {
+  const counts = new Array(CLASSES.length).fill(0)
+  for (const crop of allCrops)
+    for (const box of crop.labels)
+      if (box.classId >= 0 && box.classId < counts.length) counts[box.classId]++
+
+  for (const btn of classListEl.querySelectorAll<HTMLButtonElement>('.class-btn')) {
+    const id = Number(btn.dataset['classId'])
+    const badge = btn.querySelector<HTMLSpanElement>('.class-count')
+    if (badge) badge.textContent = counts[id] > 0 ? String(counts[id]) : ''
+  }
+}
+
+function updateProgressSummary() {
+  if (allCrops.length === 0) { progressSummary.innerHTML = ''; return }
+  const done  = allCrops.filter(c => c.done).length
+  const total = allCrops.length
+  const totalLabels = allCrops.reduce((s, c) => s + c.labels.length, 0)
+  progressSummary.innerHTML =
+    `<b>${done}/${total}</b> done &nbsp;·&nbsp; <b>${totalLabels}</b> labels`
+}
+
+// ── Save / load progress ──────────────────────────────────────────────────────
+
+async function saveProgress(dirH?: FileSystemDirectoryHandle) {
+  if (allCrops.length === 0) { setStatus('Nothing to save.'); return }
+
+  // Resolve save directory
+  if (!dirH) {
+    if (progressDirHandle) {
+      dirH = progressDirHandle
+    } else {
+      if (!(window as any).showDirectoryPicker) {
+        setStatus('File System Access API not supported — use Chrome or Edge.')
+        return
+      }
+      try {
+        dirH = await (window as any).showDirectoryPicker({ mode: 'readwrite' })
+        progressDirHandle = dirH ?? null
+      } catch (err: any) {
+        if (err?.name === 'AbortError') return
+        setStatus(`Could not open save folder: ${err?.message ?? err}`)
+        return
+      }
+    }
+  }
+
+  showLoading('Saving progress…', 'writing images…')
+  await yieldToUI()
+
+  try {
+    // crops/ subdirectory for PNGs
+    const cropsDir = await (dirH as any).getDirectoryHandle('crops', { create: true })
+
+    let saved = 0
+    for (const crop of allCrops) {
+      const base = `${crop.sheetId}_s${crop.sysIdx}`
+      await writePngToDir(cropsDir, `${base}_clean.png`, crop.canvas)
+      await writePngToDir(cropsDir, `${base}_orig.png`, crop.origCanvas)
+      saved++
+      if (saved % 10 === 0) {
+        updateLoadingPhase(`${saved} / ${allCrops.length} crops…`)
+        await yieldToUI()
+      }
+    }
+
+    // Build catalogue
+    const songMap = new Map<string, { name: string; midiFilename: string; sheetIds: string[] }>()
+    for (const sheet of sheets) {
+      const key = sheet.songName || sheet.filename
+      if (!songMap.has(key))
+        songMap.set(key, { name: sheet.songName || sheet.filename, midiFilename: sheet.midiFilename, sheetIds: [] })
+      songMap.get(key)!.sheetIds.push(sheet.id)
+    }
+
+    const data = {
+      version: 3,
+      savedAt: new Date().toISOString(),
+      catalogue: Array.from(songMap.values()).map(song => ({
+        name:         song.name,
+        midiFilename: song.midiFilename,
+        sheets: sheets
+          .filter(s => song.sheetIds.includes(s.id))
+          .map(s => ({ sheetId: s.id, filename: s.filename, pageNum: s.pageNum,
+                       width: s.width, height: s.height, songName: s.songName })),
+      })),
+      crops: allCrops.map(crop => ({
+        sheetId: crop.sheetId,
+        sysIdx:  crop.sysIdx,
+        r: crop.r, c: crop.c, w: crop.w, h: crop.h,
+        done:    crop.done,
+        labels:  crop.labels.map(b => ({ classId: b.classId, x: b.x, y: b.y, w: b.w, h: b.h })),
+      })),
+    }
+
+    updateLoadingPhase('writing progress.json…')
+    await yieldToUI()
+    const jsonFH = await (dirH as any).getFileHandle('progress.json', { create: true })
+    const writable = await (jsonFH as any).createWritable()
+    await writable.write(JSON.stringify(data, null, 2))
+    await writable.close()
+
+    hideLoading()
+    setStatus(`Saved: ${allCrops.length} crops + progress.json → ${(dirH as any).name}/`)
+  } catch (err) {
+    hideLoading()
+    setStatus(`Save error: ${(err as Error).message}`)
+    console.error('saveProgress error:', err)
+  }
+}
+
+async function writePngToDir(dir: FileSystemDirectoryHandle, filename: string, canvas: HTMLCanvasElement) {
+  const blob = await new Promise<Blob>(resolve => canvas.toBlob(b => resolve(b!), 'image/png'))
+  const fh = await (dir as any).getFileHandle(filename, { create: true })
+  const w = await (fh as any).createWritable()
+  await w.write(blob)
+  await w.close()
+}
+
+async function onLoadProgress() {
+  if (!(window as any).showDirectoryPicker) {
+    setStatus('File System Access API not supported — use Chrome or Edge.')
+    return
+  }
+
+  let dirH: FileSystemDirectoryHandle
+  try {
+    dirH = await (window as any).showDirectoryPicker({ mode: 'readwrite' })
+  } catch (err: any) {
+    if (err?.name === 'AbortError') return
+    setStatus(`Could not open folder: ${err?.message ?? err}`)
+    return
+  }
+
+  showLoading('Loading progress…', 'reading progress.json…')
+  await yieldToUI()
+
+  try {
+    // Read progress.json
+    let data: any
+    try {
+      const jfh  = await (dirH as any).getFileHandle('progress.json')
+      const jf   = await jfh.getFile()
+      data = JSON.parse(await jf.text())
+    } catch {
+      hideLoading()
+      setStatus('No progress.json found in the selected folder.')
+      return
+    }
+
+    if (!data.catalogue || !data.crops) {
+      hideLoading()
+      setStatus('progress.json is missing catalogue or crops data.')
+      return
+    }
+
+    // Open crops/ subdir
+    let cropsDir: FileSystemDirectoryHandle
+    try {
+      cropsDir = await (dirH as any).getDirectoryHandle('crops')
+    } catch {
+      hideLoading()
+      setStatus('No crops/ folder found alongside progress.json.')
+      return
+    }
+
+    // Reset state
+    sheets = []
+    allCrops = []
+    currentCropIdx = 0
+    sheetsList.innerHTML = ''
+    _lastSongHeader = ''
+    progressDirHandle = dirH  // allow re-saving to same dir
+
+    // Build Sheet stubs from catalogue
+    const sheetMap = new Map<string, Sheet>()
+    for (const songEntry of data.catalogue) {
+      for (const se of songEntry.sheets) {
+        const sheet: Sheet = {
+          id:           se.sheetId,
+          filename:     se.filename,
+          songName:     songEntry.name ?? se.songName ?? '',
+          midiFilename: songEntry.midiFilename ?? '',
+          pageNum:      se.pageNum,
+          width:        se.width  ?? 0,
+          height:       se.height ?? 0,
+          staffRemoved:    new Uint8Array(0),
+          systemBoxes:     [],
+          staffLines:      [],
+          S:               0,
+          crops:           [],
+          threshold:       0,
+          widthPctUsed:    -1,
+          rawSystemCount:  0,
+          fullGrey:        new Uint8Array(0),
+          dbgW: 0, dbgH: 0,
+          dbgGrey:    new Uint8Array(0),
+          dbgBinary:  new Uint8Array(0),
+          dbgDilated: new Uint8Array(0),
+        }
+        sheetMap.set(se.sheetId, sheet)
+        sheets.push(sheet)
+      }
+    }
+
+    // Load each crop image + labels
+    const cropEntries: any[] = data.crops ?? []
+    let loaded = 0
+    for (let i = 0; i < cropEntries.length; i++) {
+      const entry = cropEntries[i]
+      const sheet = sheetMap.get(entry.sheetId)
+      if (!sheet) continue
+
+      if (i % 5 === 0) {
+        updateLoadingPhase(`crop ${i + 1} / ${cropEntries.length}…`)
+        await yieldToUI()
+      }
+
+      const base   = `${entry.sheetId}_s${entry.sysIdx}`
+      const clean  = await loadPngFromDir(cropsDir, `${base}_clean.png`)
+      if (!clean) continue                              // image missing — skip
+      const orig = await loadPngFromDir(cropsDir, `${base}_orig.png`) ?? clean
+
+      const crop: SystemCrop = {
+        sheetId:    entry.sheetId,
+        sysIdx:     entry.sysIdx,
+        r: entry.r ?? 0, c: entry.c ?? 0,
+        w: entry.w ?? clean.width, h: entry.h ?? clean.height,
+        canvas:     clean,
+        origCanvas: orig,
+        labels: (entry.labels ?? []).map((l: any) => ({
+          id: crypto.randomUUID(),
+          classId: l.classId, x: l.x, y: l.y, w: l.w, h: l.h,
+        })),
+        done: entry.done ?? false,
+      }
+      sheet.crops.push(crop)
+      allCrops.push(crop)
+      loaded++
+    }
+
+    // Populate sheets list (only sheets that actually loaded)
+    for (const sheet of sheets) {
+      if (sheet.crops.length > 0) addSheetToList(sheet)
+    }
+
+    hideLoading()
+    updateClassCounts()
+    updateProgressSummary()
+    updateSheetProgressAll()
+    if (allCrops.length > 0) showCrop(0)
+    setStatus(`Loaded: ${loaded} crops across ${sheets.filter(s => s.crops.length > 0).length} sheets.`)
+  } catch (err) {
+    hideLoading()
+    setStatus(`Load error: ${(err as Error).message}`)
+    console.error('onLoadProgress error:', err)
+  }
+}
+
+async function loadPngFromDir(dir: FileSystemDirectoryHandle, filename: string): Promise<HTMLCanvasElement | null> {
+  try {
+    const fh   = await (dir as any).getFileHandle(filename)
+    const file = await fh.getFile()
+    const url  = URL.createObjectURL(file)
+    return await new Promise((resolve, reject) => {
+      const img = new Image()
+      img.onload = () => {
+        URL.revokeObjectURL(url)
+        const c = document.createElement('canvas')
+        c.width  = img.naturalWidth
+        c.height = img.naturalHeight
+        c.getContext('2d')!.drawImage(img, 0, 0)
+        resolve(c)
+      }
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(`Failed to load ${filename}`)) }
+      img.src = url
+    })
+  } catch {
+    return null
+  }
+}
 
 // ── Load labels (COCO JSON resume) ───────────────────────────────────────────
 
@@ -907,6 +1945,8 @@ async function onLoadLabels() {
     loaded += crop.labels.length
   }
 
+  updateClassCounts()
+  updateProgressSummary()
   setStatus(`Loaded ${loaded} labels from ${file.name}.`)
   redrawOverlay()
   renderBoxesList()
@@ -1067,8 +2107,14 @@ function hideLoading() {
 }
 
 /** Yield control back to the browser for a frame so the UI can repaint. */
+// MessageChannel.postMessage is not throttled when the window is minimized,
+// unlike setTimeout(0) which Chrome clamps to ~1s in background tabs.
+const _yieldChannel = new MessageChannel()
 function yieldToUI(): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, 0))
+  return new Promise(resolve => {
+    _yieldChannel.port1.onmessage = () => resolve()
+    _yieldChannel.port2.postMessage(null)
+  })
 }
 
 // ── Pure image processing functions (copied from pdf-test.ts) ─────────────────
